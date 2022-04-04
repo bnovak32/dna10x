@@ -22,7 +22,7 @@ parser = parse_user_input()
 ui = parser.parse_args()
 
 if exists(ui.barcodes):
-    if ui.revcomp==1:
+    if ui.revcomp=='1':
         bcset = set([revcomp(line.split()[0]) for line in open(ui.barcodes)])
     else:
         bcset = set([line.split()[0] for line in open(ui.barcodes)])
