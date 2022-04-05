@@ -20,6 +20,7 @@ def parse_user_input():
     parser.add_argument('-a','--alignment-score',type=int,required=True,help='Minimum alignment score.')
     parser.add_argument('-i','--insert-size',required=True,type=int,help='Maximum insert size.')
     parser.add_argument('-rc','--revcomp',help='Reverse complement cell barcodes.',action='store_true')
+    parser.add_argument('-sf','--skip-fastq',help='Skip fastq generation if they already exist.')
     return parser
 
 parser = parse_user_input()
@@ -38,9 +39,10 @@ print('Launching Cell Ranger to make fastqs...')
 threads=ui.threads
 directory = ui.directory
 bcl=ui.bcl
-cmd = 'cellranger-atac mkfastq --run=%(bcl)s --id=%(directory)s --csv=%(samplesheet)s --project=%(directory)s' % vars()
-print(cmd)
-os.system(cmd)
+if not ui.skip_fastq:
+    cmd = 'cellranger-atac mkfastq --run=%(bcl)s --id=%(directory)s --csv=%(samplesheet)s --project=%(directory)s' % vars()
+    print(cmd)
+    os.system(cmd)
 
 reference = ui.reference
 barcodes = ui.barcodes
