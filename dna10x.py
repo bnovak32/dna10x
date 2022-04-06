@@ -20,7 +20,7 @@ def parse_user_input():
     parser.add_argument('-a','--alignment-score',type=int,required=True,help='Minimum alignment score.')
     parser.add_argument('-i','--insert-size',required=True,type=int,help='Maximum insert size.')
     parser.add_argument('-rc','--revcomp',help='Reverse complement cell barcodes.',action='store_true')
-    parser.add_argument('-sf','--skip-fastq',help='Skip fastq generation if they already exist.')
+    parser.add_argument('-sf','--skip-fastq',action='store_true',help='Skip fastq generation if they already exist.')
     return parser
 
 parser = parse_user_input()
