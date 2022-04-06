@@ -1,26 +1,6 @@
 #! /usr/bin/python
 import gzip
 import io
-import multiprocessing as mp
-from math import ceil
-from os import getpid
-
-def collapse(addresses,cbcchs):
-    keepdict={}
-    for cbcch in cbcchs:
-        reads = addresses[cbcch]
-        keep = [1 for read in reads]
-        for i,read1 in enumerate(reads):
-            if keep[i]==1:
-                p1=read1[1]
-                p2=read1[2]
-                for j,read2 in enumerate(reads):
-                    if read2[1]==p1 or read2[2]==p2:
-                        keep[j]=0
-                        break
-        keepdict[cbcch]=keep
-    return keepdict
-
 
 def addressct(address,addressct,stats):
     r1addresses = set()
