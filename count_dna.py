@@ -22,7 +22,7 @@ def collapse(addresses,cbcchs):
     return keepdict
 
 
-def addressct(address,addressct,stats,threads):
+def addressct(address,addressct,stats):
     r1addresses = set()
     r2addresses = set()
     addresses = {}
