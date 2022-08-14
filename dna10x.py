@@ -6,7 +6,7 @@ import os
 from os.path import exists
 from glob import glob
 from pysam import AlignmentFile
-from count_dna import addressct
+from count_dna import fragments
 import subprocess
 
 def parse_user_input():
@@ -21,6 +21,7 @@ def parse_user_input():
     parser.add_argument('-i','--insert-size',required=True,type=int,help='Maximum insert size.')
     parser.add_argument('-rc','--revcomp',help='Reverse complement cell barcodes.',action='store_true')
     parser.add_argument('-sf','--skip-fastq',action='store_true',help='Skip fastq generation if they already exist.')
+    parser.add_argument('-sa','--skip-align',action='store_true',help='Skip alignment with bwa mem if bam already exists.')
     return parser
 
 parser = parse_user_input()
@@ -36,7 +37,7 @@ else:
     exit()
 
 print('Launching Cell Ranger to make fastqs...')
-threads=ui.threads
+threads=int(ui.threads)
 directory = ui.directory
 bcl=ui.bcl
 if not ui.skip_fastq:
@@ -61,48 +62,52 @@ for sample in samples:
     procs=[]
     fastqouts=[]
     revcomp=0
+    bamout=directory+'/outs/fastq_path/'+project+'/'+sample+'/'+sample+'.bam'
     if ui.revcomp:
         revcomp=1
-    for r1,r2,r3 in zip(R1list,R2list,R3list):
-        fastqout = directory+'/outs/fastq_path/'+project+'/'+sample+'/'+sample+'_'+str(j)+'.fastq.gz'
-        cmd='python call_demux.py -r1 %(r1)s -r2 %(r2)s -r3 %(r3)s -b %(barcodes)s -r %(revcomp)d| gzip > %(fastqout)s' % vars()
-        print(cmd)
-        p=subprocess.Popen(cmd,shell=True)
-        procs.append(p)
-        fastqouts.append(fastqout)
-        j+=1
-    p_exit = [p.wait() for p in procs]
+    if not ui.skip_align:
+        for r1,r2,r3 in zip(R1list,R2list,R3list):
+            fastqout = directory+'/outs/fastq_path/'+project+'/'+sample+'/'+sample+'_'+str(j)+'.fastq.gz'
+            cmd='python call_demux.py -r1 %(r1)s -r2 %(r2)s -r3 %(r3)s| gzip > %(fastqout)s' % vars()
+            print(cmd)
+            p=subprocess.Popen(cmd,shell=True)
+            procs.append(p)
+            fastqouts.append(fastqout)
+            j+=1
+        p_exit = [p.wait() for p in procs]
 
-    bamout=directory+'/outs/fastq_path/'+project+'/'+sample+'/'+sample+'.bam'
-    fqs = ' '.join(fastqouts)
-    cmd = "bwa mem -p -C -M -t %(threads)d %(reference)s '<zcat %(fqs)s' | samtools view -Sb - > %(bamout)s" % vars()
-    print(cmd)
-    os.system(cmd)
+        fqs = ' '.join(fastqouts)
+        cmd = "bwa mem -p -C -M -t %(threads)d %(reference)s '<zcat %(fqs)s' | samtools view -Sb - > %(bamout)s" % vars()
+        print(cmd)
+        os.system(cmd)
+
     address=directory+'/outs/fastq_path/'+project+'/'+sample+'/'+sample+'.address.txt.gz'    
+    chrs=[line.split()[0][1::] for line in open(reference) if line[0]=='>']
+    '''
     with gzip.open(address, 'wb') as g:
         with AlignmentFile(bamout,'rb') as f:
-            pair = 0
             plist=[]
             for read in f:
                 score = int(read.get_tag('AS'))
                 isize = int(read.tlen)
-                if score>ui.alignment_score and abs(isize)<ui.insert_size:   
-                    readid = ':'.join(read.qname.split(':')[3:7])
-                    cbc = read.get_tag('BC') 
-                    ch = f.getrname(read.reference_id)
-                    p1 = read.reference_start
-                    if pair==0:
-                        plist=[readid,cbc,ch,p1,score,isize]
-                        pair=1
-                    else:
-                        if readid==plist[0]:
-                            newline = readid+'\t'+cbc+'\t'+ch+'\t'+str(plist[3])+'\t'+str(p1)+'\t'+str(plist[4])+'\t'+str(score)+'\t'+str(plist[5])+'\n'
-                            g.write(newline.encode())
-                            pair=0
+                if read.is_read1:
+                    if score>ui.alignment_score and abs(isize)<ui.insert_size and isize!=0:
+                        readid = ':'.join(read.qname.split(':')[3:7])
+                        cbc = read.get_tag('BC')[0:16]
+                        cbcq = read.get_tag('BC')[16::]
+                        ch = f.getrname(read.reference_id)
+                        chrs.add(ch)
+                        if isize>0:
+                            p1 = read.reference_start+4
+                            p2 = p1+isize-5
                         else:
-                            plist=[readid,cbc,ch,p1,score,isize]
-    counts = directory+'/outs/fastq_path/'+project+'/'+sample+'/'+sample+'.addressct.txt'
-    stats = directory+'/outs/fastq_path/'+project+'/'+sample+'/'+sample+'.stats.txt'
-    addressct(address,counts,stats)
-
+                            p1 = read.next_reference_start+4
+                            p2 = p1-isize-5
+                        newline=readid+'\t'+cbc+'\t'+cbcq+'\t'+ch+'\t'+str(p1)+'\t'+str(p2)+'\t'+str(score)+'\t'+str(isize)+'\n'
+                        g.write(newline.encode())
+    '''
+    fragfile = directory+'/outs/fastq_path/'+project+'/'+sample+'/'+sample+'.fragments.tsv'
+    chrs = sorted(chrs)
+    print(chrs)
+    fragments(sample,reference,address,fragfile,barcodes,revcomp,chrs)
 
