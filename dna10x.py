@@ -83,7 +83,6 @@ for sample in samples:
 
     address=directory+'/outs/fastq_path/'+project+'/'+sample+'/'+sample+'.address.txt.gz'    
     chrs=[line.split()[0][1::] for line in open(reference) if line[0]=='>']
-    '''
     with gzip.open(address, 'wb') as g:
         with AlignmentFile(bamout,'rb') as f:
             plist=[]
@@ -105,9 +104,7 @@ for sample in samples:
                             p2 = p1-isize-5
                         newline=readid+'\t'+cbc+'\t'+cbcq+'\t'+ch+'\t'+str(p1)+'\t'+str(p2)+'\t'+str(score)+'\t'+str(isize)+'\n'
                         g.write(newline.encode())
-    '''
     fragfile = directory+'/outs/fastq_path/'+project+'/'+sample+'/'+sample+'.fragments.tsv'
     chrs = sorted(chrs)
-    print(chrs)
     fragments(sample,reference,address,fragfile,barcodes,revcomp,chrs)
 
