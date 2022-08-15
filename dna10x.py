@@ -6,8 +6,12 @@ import os
 from os.path import exists
 from glob import glob
 from pysam import AlignmentFile
-from count_dna import fragments
+from count_dna import chrfragments,chrfragments_output,fragments
 import subprocess
+from address import address,contig_address
+from error_correct import cbccorrect,revcomp
+from functools import partial
+from multiprocessing import Pool
 
 def parse_user_input():
     parser = argparse.ArgumentParser()
@@ -20,6 +24,7 @@ def parse_user_input():
     parser.add_argument('-a','--alignment-score',type=int,required=True,help='Minimum alignment score.')
     parser.add_argument('-i','--insert-size',required=True,type=int,help='Maximum insert size.')
     parser.add_argument('-rc','--revcomp',help='Reverse complement cell barcodes.',action='store_true')
+    parser.add_argument('-pc','--parallel-contig',action='store_true',help='Run fragment counting for contigs in parallel.')
     parser.add_argument('-sf','--skip-fastq',action='store_true',help='Skip fastq generation if they already exist.')
     parser.add_argument('-sa','--skip-align',action='store_true',help='Skip alignment with bwa mem if bam already exists.')
     return parser
@@ -61,10 +66,7 @@ for sample in samples:
     j=1
     procs=[]
     fastqouts=[]
-    revcomp=0
     bamout=directory+'/outs/fastq_path/'+project+'/'+sample+'/'+sample+'.bam'
-    if ui.revcomp:
-        revcomp=1
     if not ui.skip_align:
         for r1,r2,r3 in zip(R1list,R2list,R3list):
             fastqout = directory+'/outs/fastq_path/'+project+'/'+sample+'/'+sample+'_'+str(j)+'.fastq.gz'
@@ -81,30 +83,34 @@ for sample in samples:
         print(cmd)
         os.system(cmd)
 
-    address=directory+'/outs/fastq_path/'+project+'/'+sample+'/'+sample+'.address.txt.gz'    
+    addressfile=directory+'/outs/fastq_path/'+project+'/'+sample+'/'+sample+'.address.txt.gz'    
+    fragfile=directory+'/outs/fastq_path/'+project+'/'+sample+'/'+sample+'.fragments.tsv'
     chrs=[line.split()[0][1::] for line in open(reference) if line[0]=='>']
-    with gzip.open(address, 'wb') as g:
-        with AlignmentFile(bamout,'rb') as f:
-            plist=[]
-            for read in f:
-                score = int(read.get_tag('AS'))
-                isize = int(read.tlen)
-                if read.is_read1:
-                    if score>ui.alignment_score and abs(isize)<ui.insert_size and isize!=0:
-                        readid = ':'.join(read.qname.split(':')[3:7])
-                        cbc = read.get_tag('BC')[0:16]
-                        cbcq = read.get_tag('BC')[16::]
-                        ch = f.getrname(read.reference_id)
-                        chrs.add(ch)
-                        if isize>0:
-                            p1 = read.reference_start+4
-                            p2 = p1+isize-5
-                        else:
-                            p1 = read.next_reference_start+4
-                            p2 = p1-isize-5
-                        newline=readid+'\t'+cbc+'\t'+cbcq+'\t'+ch+'\t'+str(p1)+'\t'+str(p2)+'\t'+str(score)+'\t'+str(isize)+'\n'
-                        g.write(newline.encode())
-    fragfile = directory+'/outs/fastq_path/'+project+'/'+sample+'/'+sample+'.fragments.tsv'
-    chrs = sorted(chrs)
-    fragments(sample,reference,address,fragfile,barcodes,revcomp,chrs)
+    chrs=sorted(chrs)
+    bclen=16
+    if exists(barcodes):
+        if ui.revcomp:
+            bcset = set([revcomp(line.split()[0]) for line in open(barcodes)])
+        else:
+            bcset = set([line.split()[0] for line in open(barcodes)])
+    else:
+        print("Error: can't find barcode whitelist file.")
+        exit()   
+     
+    if ui.parallel_contig:
+        if __name__ == '__main__':
+            addressfile=directory+'/outs/fastq_path/'+project+'/'+sample+'/'+sample
+            ch_cbcdict,ch_qcbcdict,cbcfreq_dict=contig_address(addressfile,chrs,bamout,bclen,bcset,ui.alignment_score,ui.insert_size)
+            partial_correct=partial(cbccorrect, cbcfreq_dict=cbcfreq_dict)
+            with Pool(processes=len(chrs)) as pool:
+                newcbcs=pool.starmap(partial_correct,
+                    iterable=zip([ch_cbcdict[ch] for ch in chrs],[ch_qcbcdict[ch] for ch in chrs]))
+            with Pool(processes=len(chrs)) as pool:
+                fragdicts = pool.starmap(chrfragments,
+                    iterable=zip([addressfile+'.'+ch+'.address.txt.gz' for ch in chrs],newcbcs))
+            chrfragments_output(sample,fragfile,reference,fragdicts,chrs)
+    else:
+        cbcs,qcbcs,cbcfreq_dict=address(addressfile,bamout,bclen,bcset,ui.alignment_score,ui.insert_size)
+        newcbcs=cbccorrect(cbcs,qcbcs,cbcfreq_dict) 
+        fragments(sample,reference,addressfile,fragfile,chrs,newcbcs)    
 
