@@ -8,10 +8,12 @@ def parse_user_input():
     parser.add_argument('-r1','--read1-fastq',required=True,help='Path to read 1 fastq file.')
     parser.add_argument('-r2','--read2-fastq',required=True,help='Path to read 2 fastq file.')
     parser.add_argument('-r3','--read3-fastq',required=True,help='Path to read 3 fastq file.')
+    parser.add_argument('-p','--barcode-position',type=int,required=True,help='1-indexed position of barcode in read 2.')
     return parser
 
 parser = parse_user_input()
 ui = parser.parse_args()
 
-demux(ui.read1_fastq,ui.read2_fastq,ui.read3_fastq)
+pos=ui.barcode_position-1
+demux(ui.read1_fastq,ui.read2_fastq,ui.read3_fastq,pos)
 

@@ -23,6 +23,7 @@ def parse_user_input():
     parser.add_argument('-r','--reference',required=True,help='Path to reference genome.')
     parser.add_argument('-a','--alignment-score',type=int,required=True,help='Minimum alignment score.')
     parser.add_argument('-i','--insert-size',required=True,type=int,help='Maximum insert size.')
+    parser.add_argument('-p','--barcode-position',type=int,required=True,help='1-indexed cell barcode position in read 2.')
     parser.add_argument('-rc','--revcomp',help='Reverse complement cell barcodes.',action='store_true')
     parser.add_argument('-pc','--parallel-contig',action='store_true',help='Run fragment counting for contigs in parallel.')
     parser.add_argument('-sf','--skip-fastq',action='store_true',help='Skip fastq generation if they already exist.')
@@ -52,6 +53,7 @@ if not ui.skip_fastq:
 
 reference = ui.reference
 barcodes = ui.barcodes
+pos = ui.barcode_position
 for sample in samples:
     project = samples[sample]
     fastqpath = directory+'/outs/fastq_path/'+project+'/'+sample+'/*'
@@ -70,7 +72,7 @@ for sample in samples:
     if not ui.skip_align:
         for r1,r2,r3 in zip(R1list,R2list,R3list):
             fastqout = directory+'/outs/fastq_path/'+project+'/'+sample+'/'+sample+'_'+str(j)+'.fastq.gz'
-            cmd='python call_demux.py -r1 %(r1)s -r2 %(r2)s -r3 %(r3)s| gzip > %(fastqout)s' % vars()
+            cmd='python call_demux.py -r1 %(r1)s -r2 %(r2)s -r3 %(r3)s -p %(pos)d| gzip > %(fastqout)s' % vars()
             print(cmd)
             p=subprocess.Popen(cmd,shell=True)
             procs.append(p)
