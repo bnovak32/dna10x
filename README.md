@@ -2,8 +2,9 @@
 
 This is a data processing pipeline for scDNA-seq data generating by tagmentation generating using the 10x Genomics scATAC-seq kit. It has the following dependencies:
 
-- python v3.7
-- pysam v0.15.3 
+- python v3.9.13
+- pysam v0.19.1 
 - bwa v0.7.17
-- samtools v1.9-180-gf9e1caf
-- cellranger-atac v2.0.0 
+- samtools v1.16.1
+- cellranger-atac v2.0.0
+- cutadapt v4.1 
