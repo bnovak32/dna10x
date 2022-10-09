@@ -7,4 +7,9 @@ This is a data processing pipeline for scDNA-seq data generating by tagmentation
 - bwa v0.7.17
 - samtools v1.16.1
 - cellranger-atac v2.0.0
-- cutadapt v4.1 
+- cutadapt v4.1
+
+Try the following to install a conda environment:
+```
+conda create -n cutadapt -c bioconda -c conda-forge cutadapt python=3.9 bwa pysam samtools numpy
+```
