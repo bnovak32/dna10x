@@ -43,13 +43,14 @@ def chrfragments_output(sample,fragfile,ref,frags,chrs):
                 g.write(st)
 
 
+
 def fragments(sample,ref,addressfile,fragfile,chrs,newcbcs):
     frags={ch:{} for ch in chrs}
     with io.BufferedReader(gzip.open(addressfile,'rb')) as f:
         for i,line in enumerate(f):
             dlist = line.decode().split()
-            ch=dlist[2]
-            address='_'.join([dlist[3],dlist[4],newcbcs[i]])
+            ch=dlist[3]
+            address='_'.join([dlist[4],dlist[5],newcbcs[i]])
             if address not in frags[ch]:
                 frags[ch][address]=1
             else:

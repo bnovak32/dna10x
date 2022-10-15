@@ -8,7 +8,7 @@ from glob import glob
 from pysam import AlignmentFile
 from count_dna import chrfragments,chrfragments_output,fragments
 import subprocess
-from address import address
+from address import address,contig_address
 from error_correct import cbccorrect,revcomp
 from functools import partial
 from multiprocessing import Pool
@@ -28,6 +28,7 @@ def parse_user_input():
     parser.add_argument('-sa','--skip-align',action='store_true',help='Skip alignment with bwa mem if bam already exists.')
     parser.add_argument('-c','--cutadapt',action='store_true',help='Run cutadapt on interleaved fastq.')
     parser.add_argument('-ad','--adapter',required=False,help='Adapter sequence to be trimmed by cutadapt.')
+    parser.add_argument('-sc','--separate-contigs',action='store_true',help='Process congigs separately.')
     return parser
 
 parser = parse_user_input()
@@ -74,11 +75,11 @@ for sample in samples:
             fastqout = directory+'/outs/fastq_path/'+project+'/'+sample+'/'+sample+'_'+str(j)+'.fastq.gz'
             cmd='python call_demux.py -r1 %(r1)s -r2 %(r2)s -r3 %(r3)s -p %(pos)d| gzip > %(fastqout)s' % vars()
             print(cmd)
-#            p=subprocess.Popen(cmd,shell=True)
-#            procs.append(p)
+            p=subprocess.Popen(cmd,shell=True)
+            procs.append(p)
             fastqouts.append(fastqout)
             j+=1
-#p_exit = [p.wait() for p in procs]
+        p_exit = [p.wait() for p in procs]
 
         fqs = ' '.join(fastqouts)
         print(fastqouts)
@@ -105,8 +106,16 @@ for sample in samples:
     else:
         print("Error: can't find barcode whitelist file.")
         exit()   
-     
-    cbcs,qcbcs,cbcfreq_dict=address(addressfile,bamout,bclen,bcset,ui.insert_size)
-    newcbcs=cbccorrect(cbcs,qcbcs,cbcfreq_dict) 
-    fragments(sample,reference,addressfile,fragfile,chrs,newcbcs)    
+    if ui.separate_contigs:
+        addressfile = directory+'/outs/fastq_path/'+project+'/'+sample+'/'+sample
+        ch_cbcdict,ch_qcbcdict,cbcfreq_dict=contig_address(addressfile,chrs,bamout,bclen,bcset,ui.insert_size)
+        for ch in chrs:
+            newcbcs=cbccorrect(ch_cbcdict[ch],ch_qcbcdict[ch],cbcfreq_dict)
+            fragfile=directory+'/outs/fastq_path/'+project+'/'+sample+'/'+sample+'.'+ch+'.fragments.tsv'
+            addressfile = directory+'/outs/fastq_path/'+project+'/'+sample+'/'+sample+'.'+ch+'.address.txt.gz'
+            fragments(sample,reference,addressfile,fragfile,chrs,newcbcs)
+    else:
+        cbcs,qcbcs,cbcfreq_dict=address(addressfile,bamout,bclen,bcset,ui.insert_size)
+        newcbcs=cbccorrect(cbcs,qcbcs,cbcfreq_dict) 
+        fragments(sample,reference,addressfile,fragfile,chrs,newcbcs)    
 
