@@ -52,7 +52,7 @@ def address(address,bamout,bclen,bcset,insert_size):
         cbcfreq_dict[cbc]=cbcfreq_dict[cbc]/tot
     return cbcs,qcbcs,cbcfreq_dict
 
-def contig_address(address,chrs,bamout,bclen,bcset,insert_size):
+def contig_address(address,chrs,bamout,bclen,bcset,insert_size,minscore):
     outfiles = [address+'.'+ch+'.address.txt.gz' for ch in chrs]
     outputs = {ch:gzip.open(outfile,'wb') for ch,outfile in zip(chrs,outfiles)}
     ch_cbcdict={ch:[] for ch in chrs}
@@ -65,7 +65,7 @@ def contig_address(address,chrs,bamout,bclen,bcset,insert_size):
             score = read.get_tag('AS')
             isize = read.tlen
             rlen= read.rlen
-            if read.is_read1 and score*isize!=0 and abs(isize)<insert_size:
+            if read.is_read1 and score>0 and isize!=0 and score/rlen>minscore and abs(isize)<insert_size:
                 readid = ':'.join(read.qname.split(':')[3:7])
                 cbc = read.get_tag('BC')[0:16]
                 qcbc = read.get_tag('BC')[16::]
@@ -82,7 +82,7 @@ def contig_address(address,chrs,bamout,bclen,bcset,insert_size):
                 readid = ':'.join(read.qname.split(':')[3:7])
                 if readid in rdict:
                     score = read.get_tag('AS')
-                    if score>0:
+                    if score>0 and score/rlen>minscore:
                         rlen=read.rlen
                         nl=rdict[readid]
                         cbc=nl.split()[1]
