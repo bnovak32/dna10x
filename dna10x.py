@@ -15,7 +15,7 @@ from multiprocessing import Pool
 
 def parse_user_input():
 	parser = argparse.ArgumentParser()
-	parser.add_argument('-bc','--bcl',required=True,help='Directory with base calling data.')
+	parser.add_argument('-bc','--bcl',required=False,help='Directory with base calling data.')
 	parser.add_argument('-s','--samplesheet',required=True,help='Path to sample sheet.')
 	parser.add_argument('-d','--directory',required=True,help='Output directory.')
 	parser.add_argument('-b','--barcodes',required=True,help='Path to 10x barcode whitelist.')
@@ -30,6 +30,7 @@ def parse_user_input():
 	parser.add_argument('-c','--cutadapt',action='store_true',help='Run cutadapt on interleaved fastq.')
 	parser.add_argument('-ad','--adapter',required=False,help='Adapter sequence to be trimmed by cutadapt.')
 	parser.add_argument('-sc','--separate-contigs',action='store_true',help='Process congigs separately.')
+	parser.add_argument('-sd','--skip-demux',action='store_true',help='Skip production of barcoded fastqs.')
 	return parser
 
 parser = parse_user_input()
@@ -71,7 +72,7 @@ for sample in samples:
 	procs=[]
 	fastqouts=[]
 	bamout=directory+'/outs/fastq_path/'+project+'/'+sample+'/'+sample+'.bam'
-	if not ui.skip_align:
+	if not ui.skip_demux:
 		for r1,r2,r3 in zip(R1list,R2list,R3list):
 			fastqout = directory+'/outs/fastq_path/'+project+'/'+sample+'/'+sample+'_'+str(j)+'.fastq.gz'
 			cmd='python call_demux.py -r1 %(r1)s -r2 %(r2)s -r3 %(r3)s -p %(pos)d| gzip > %(fastqout)s' % vars()
@@ -81,7 +82,12 @@ for sample in samples:
 			fastqouts.append(fastqout)
 			j+=1
 		p_exit = [p.wait() for p in procs]
-
+	else:
+		for r1,r2,r3 in zip(R1list,R2list,R3list):
+			fastqout = directory+'/outs/fastq_path/'+project+'/'+sample+'/'+sample+'_'+str(j)+'.fastq.gz'
+			fastqouts.append(fastqout)
+			j+=1
+	if not ui.skip_align:
 		fqs = ' '.join(fastqouts)
 		print(fastqouts)
 		if not ui.cutadapt:
