@@ -8,7 +8,7 @@ from glob import glob
 from pysam import AlignmentFile
 from count_dna import chrfragments,chrfragments_output,fragments
 import subprocess
-from address import address,contig_address
+from address import contig_address
 from error_correct import cbccorrect,revcomp
 from functools import partial
 from multiprocessing import Pool
@@ -119,4 +119,17 @@ for sample in samples:
 		fragfile=directory+'/outs/fastq_path/'+project+'/'+sample+'/'+sample+'.'+ch+'.fragments.tsv'
 		addressfile = directory+'/outs/fastq_path/'+project+'/'+sample+'/'+sample+'.'+ch+'.address.txt.gz'
 		fragments(sample,reference,addressfile,fragfile,chrs,newcbcs)
+	fragfile = directory+'/outs/fastq_path/'+project+'/'+sample+'/'+sample+'.fragments.tsv'
+	with open(fragfile,'w') as g:
+		for i,ch in enumerate(chrs):
+			infile = directory+'/outs/fastq_path/'+project+'/'+sample+'/'+sample+'.'+ch+'.fragments.tsv'
+			with open(infile) as f:
+				if line[0]=='#':
+					if i==0:
+						g.write(line)
+				else:
+					g.write(line)
+			cmd='rm %(infile)s' % vars()
+			os.system(cmd)
+
 	
