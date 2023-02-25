@@ -19,7 +19,7 @@ If you already have a fastq, then cellranger-atac is not required, but otherwise
 Here's an example command:
 
 ```
-python dna10x.py --bcl DIRECTORY_WITH_BCL_DATA --samplesheet SAMPLESHEET.csv -d OUTPUT_DIRECTORY --barcodes CELL_BARCODE_STANDARD_LIST.txt -t N_THREADS --reference GENOME.fa -i 1000 -p BARCODE_START_CYCLE -rc -c -ad CTGTCTCTTATACACATCT -sc
+python dna10x.py --bcl DIRECTORY_WITH_BCL_DATA --samplesheet SAMPLESHEET.csv -d OUTPUT_DIRECTORY --barcodes CELL_BARCODE_STANDARD_LIST.txt -t N_THREADS --reference GENOME.fa -i 1000 -p BARCODE_START_CYCLE -rc -c -ad CTGTCTCTTATACACATCT
 ```
 
 where CELL_BARCODE_STANDARD_LIST.txt is a one-column table of, for example, 10x Genomics cell barcode sequences.
