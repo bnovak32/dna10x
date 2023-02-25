@@ -124,11 +124,12 @@ for sample in samples:
 		for i,ch in enumerate(chrs):
 			infile = directory+'/outs/fastq_path/'+project+'/'+sample+'/'+sample+'.'+ch+'.fragments.tsv'
 			with open(infile) as f:
-				if line[0]=='#':
-					if i==0:
+				for line in f:
+					if line[0]=='#':
+						if i==0:
+							g.write(line)
+					else:
 						g.write(line)
-				else:
-					g.write(line)
 			cmd='rm %(infile)s' % vars()
 			os.system(cmd)
 
