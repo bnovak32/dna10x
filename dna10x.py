@@ -44,11 +44,11 @@ else:
 	print("Error: can't find sample sheet.")
 	exit()
 
-print('Launching Cell Ranger to make fastqs...')
 threads=int(ui.threads)
 directory = ui.directory
 bcl=ui.bcl
 if not ui.skip_fastq:
+	print('Launching Cell Ranger to make fastqs...')
 	cmd = 'cellranger-atac mkfastq --run=%(bcl)s --id=%(directory)s --csv=%(samplesheet)s --project=%(directory)s' % vars()
 	print(cmd)
 	os.system(cmd)
