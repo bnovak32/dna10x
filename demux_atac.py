@@ -4,7 +4,7 @@ import io
 import sys
 
 
-def demux(r1,r2,r3,p):
+def demux(r1,r2,r3,p,sra=False):
     i=0
     end=p+16
     with io.BufferedReader(gzip.open(r1,'rb')) as f1, io.BufferedReader(gzip.open(r2,'rb')) as f2, io.BufferedReader(gzip.open(r3,'rb')) as f3:
@@ -24,7 +24,13 @@ def demux(r1,r2,r3,p):
                 i+=1
             elif i==3:
                 bcq = line2.decode()[p:end]
-                newlines=store11.split()[0]+' BC:Z:'+bc+bcq+'\n'+store21+store31+line1.decode()+store13.split()[0]+' BC:Z:'+bc+bcq+'\n'+store23+store33+line3.decode()
+                if not sra:
+                    newlines=store11.split()[0]+' BC:Z:'+bc+bcq+'\n'+store21+store31+line1.decode()+store13.split()[0]+' BC:Z:'+bc+bcq+'\n'+store23+store33+line3.decode()
+                else:
+                    bc_tag = 'CR:Z:'+bc
+                    bcq_tag = 'CY:Z:'+bcq
+                    read_name = "\t".join((store11.split(" ")[1],bc_tag, bcq_tag))
+                    newlines="@"+read_name+'\n'+store21+"+"+'\n'+line1.decode()+"@"+read_name+'\n'+store23+"+"+'\n'+line3.decode()
                 sys.stdout.write(newlines)
                 i=0
     return 0
