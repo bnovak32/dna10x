@@ -5,16 +5,14 @@ import io
 import os
 from os.path import exists
 from glob import glob
-import sys
 from pysam import AlignmentFile
-from count_dna import chrfragments,chrfragments_output,fragments,fragments_and_corrected_bam
+from count_dna import chrfragments,chrfragments_output,fragments
 import subprocess
 from address_mod import contig_address
 from error_correct import cbccorrect,revcomp
 from functools import partial
 from multiprocessing import Pool
 import re
-
 
 def parse_user_input():
 	parser = argparse.ArgumentParser()
@@ -33,7 +31,6 @@ def parse_user_input():
 	parser.add_argument('-c','--cutadapt',action='store_true',help='Run cutadapt on interleaved fastq.')
 	parser.add_argument('-ad','--adapter',required=False,help='Adapter sequence to be trimmed by cutadapt.')
 	parser.add_argument('-sd','--skip-demux',action='store_true',help='Skip production of barcoded fastqs.')
-	parser.add_argument('-chr','--chromosomes', help='list of chromosomes to process')
 	return parser
 
 parser = parse_user_input()
@@ -43,7 +40,7 @@ samplesheet=ui.samplesheet
 if exists(samplesheet):
 	with open(samplesheet) as f:
 		next(f)
-		samples = dict(x.strip().split(',')[1:3] for x in f)
+		samples = {line.split(',')[1]:ui.directory for line in f}
 else:
 	print("Error: can't find sample sheet.")
 	exit()
@@ -55,13 +52,12 @@ if not ui.skip_fastq:
 	print('Launching Cell Ranger to make fastqs...')
 	cmd = 'cellranger-atac mkfastq --run=%(bcl)s --id=%(directory)s --csv=%(samplesheet)s --project=%(directory)s' % vars()
 	print(cmd)
-	# os.system(cmd)
+	os.system(cmd)
 
 reference = ui.reference
 barcodes = ui.barcodes
 pos = ui.barcode_position
 for sample in samples:
-	print("sample: ", sample)
 	project = samples[sample]
 	fastqpath = directory+'/outs/fastq_path/'+project+'/'+sample+'/*'
 	fastqs = glob(fastqpath)
@@ -75,8 +71,7 @@ for sample in samples:
 	j=1
 	procs=[]
 	fastqouts=[]
-	bamout=os.path.join(directory,'outs','fastq_path',project,sample,sample+'.bam')
-	bamsorted = os.path.join(directory,'outs','fastq_path',project,sample,sample+'.sorted.bam')
+	bamout=directory+'/outs/fastq_path/'+project+'/'+sample+'/'+sample+'.bam'
 	if not ui.skip_demux:
 		for r1,r2,r3 in zip(R1list,R2list,R3list):
 			fastqout = directory+'/outs/fastq_path/'+project+'/'+sample+'/'+sample+'_'+str(j)+'.fastq.gz'
@@ -94,34 +89,27 @@ for sample in samples:
 			j+=1
 	if not ui.skip_align:
 		fqs = ' '.join(fastqouts)
+		print(fastqouts)
 		if not ui.cutadapt:
 			cmd = "bwa mem -p -C -M -t %(threads)d %(reference)s '<zcat %(fqs)s' | samtools view -Sb - > %(bamout)s" % vars()
 			print(cmd)
-			# os.system(cmd)
+			os.system(cmd)
 		else:
 			adapter = ui.adapter
 			cmd = "zcat %(fqs)s | cutadapt -a %(adapter)s -A %(adapter)s --interleaved --cores=%(threads)s -o - - | bwa mem -p -C -M -t %(threads)s %(reference)s - | samtools view -Sb - > %(bamout)s" % vars()
 			print(cmd)
-			# os.system(cmd)
+			os.system(cmd)
 
-	# follow symlink if any
-	if not os.path.exists(bamout):
-		sys.exist('BAM file does not exist: {}'.format(bamout))
-	
 	addressfile=directory+'/outs/fastq_path/'+project+'/'+sample+'/'+sample+'.address.txt.gz'	
 	fragfile=directory+'/outs/fastq_path/'+project+'/'+sample+'/'+sample+'.fragments.tsv'
-	if ui.chromosomes is not None and os.path.exists(ui.chromosomes):
-		with open(ui.chromosomes) as f:
-			chrs=[line.split()[0] for line in f]
+	if reference.endswith('.gz'):
+		fai = re.sub('.gz$', '.fai', reference)
 	else:
-		if reference.endswith('.gz'):
-			fai = re.sub('.gz$', '.fai', reference)
-		else:
-			fai = reference+'.fai'
-		if os.path.exists(reference+'.fai'):
-			chrs = [line.split()[0] for line in open(fai)]
-		else:
-			chrs=[line.split()[0][1::] for line in open(reference) if line[0]=='>']
+		fai = reference+'.fai'
+	if os.path.exists(reference+'.fai'):
+		chrs = [line.split()[0] for line in open(fai)]
+	else:
+		chrs=[line.split()[0][1::] for line in open(reference) if line[0]=='>']
 	chrs=sorted(chrs)
 	bclen=16
 	if exists(barcodes):
@@ -133,16 +121,12 @@ for sample in samples:
 		print("Error: can't find barcode whitelist file.")
 		exit()   
 	addressfile = directory+'/outs/fastq_path/'+project+'/'+sample+'/'+sample
-	ch_cbcdict,ch_qcbcdict,cbcfreq_dict=contig_address(addressfile,chrs,bamout,bcset,ui.insert_size,ui.minscore)
+	ch_cbcdict,ch_qcbcdict,cbcfreq_dict=contig_address(addressfile,chrs,bamout,bclen,bcset,ui.insert_size,ui.minscore)
 	for ch in chrs:
 		newcbcs=cbccorrect(ch_cbcdict[ch],ch_qcbcdict[ch],cbcfreq_dict)
 		fragfile=directory+'/outs/fastq_path/'+project+'/'+sample+'/'+sample+'.'+ch+'.fragments.tsv'
 		addressfile = directory+'/outs/fastq_path/'+project+'/'+sample+'/'+sample+'.'+ch+'.address.txt.gz'
-		if os.path.exists(bamsorted):
-			fragments_and_corrected_bam(sample,reference,addressfile,fragfile,chrs,newcbcs,bamsorted,ch)
-		else:
-			fragments(sample,reference,addressfile,fragfile,chrs,newcbcs)
-	# collect per chromosome fragments into a single file
+		fragments(sample,reference,addressfile,fragfile,chrs,newcbcs)
 	fragfile = directory+'/outs/fastq_path/'+project+'/'+sample+'/'+sample+'.fragments.tsv'
 	with open(fragfile,'w') as g:
 		for i,ch in enumerate(chrs):
@@ -155,13 +139,6 @@ for sample in samples:
 					else:
 						g.write(line)
 			cmd='rm %(infile)s' % vars()
-			print(cmd)
 			os.system(cmd)
-	cmd = 'samtools merge -n -o ' + \
-			directory+'/outs/fastq_path/'+project+'/'+sample+'/'+sample+'.cbc_corrected.bam ' + \
-			directory+'/outs/fastq_path/'+project+'/'+sample+'/'+sample+'.sorted.chr*corrected.bam && ' + \
-			'rm '+directory+'/outs/fastq_path/'+project+'/'+sample+'/'+sample+'.sorted.chr*corrected.bam'
-	print(cmd)
-	os.system(cmd)
 
 	

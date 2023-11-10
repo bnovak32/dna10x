@@ -1,8 +1,24 @@
 #! /usr/bin/python
 from pysam import AlignmentFile
 import gzip
-import io
 
+
+def get_raw_cbcfreq_dict(inbam):
+    cbcfreq_dict = {}
+    tot = 0
+    with AlignmentFile(inbam, 'rb') as f:
+        for read in f:
+            if read.is_read1 and not read.is_secondary and not read.is_supplementary:
+                cbc = read.get_tag('CR')
+                qcbc = read.get_tag('CY')
+                if cbc in cbcfreq_dict:
+                    cbcfreq_dict[cbc]+=1
+                else:
+                    cbcfreq_dict[cbc]=1 
+                tot+=1
+    for cbc in cbcfreq_dict:
+        cbcfreq_dict[cbc]=cbcfreq_dict[cbc]/tot  
+    return cbcfreq_dict
 
 
 def contig_address(address,chrs,bamout,bcset,insert_size,minscore):
